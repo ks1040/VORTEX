@@ -1,0 +1,158 @@
+// JavaScript for VORTEXX Typing Trainer
+
+// VORTEXX layout - home, top, bottom row sets
+typingLevels = [
+  ['t', 'i'],
+  ['e', 'h'],
+  ['o', 's'],
+  ['u', 'n'],
+  ['a', 'd'],
+  ['q', 'j'],
+  ['g', 'r'],
+  ['y', 'l'],
+  ['z', 'x'],
+  ['c', 'v'],
+  ['b', 'm'],
+  ['w', 'f'],
+  ['k', 'p']
+];
+
+// Add keyboard remap for VORTEXX (replace this map with actual mapping logic as needed)
+const vortexxMap = {
+  'f': 't', 'j': 'i', 'd': 'e', 'k': 'h', 's': 'o', 'l': 's',
+  'a': 'u', ';': 'n', 'q': 'a', "'": 'd', 'z': 'q', 'm': 'j',
+  'g': 'g', 'h': 'r', 'y': 'y', 'u': 'l', 'x': 'z', 'c': 'x',
+  'v': 'c', 'b': 'v', 'n': 'b', 'e': 'm', 'r': 'w', 't': 'f',
+  'i': 'k', 'o': 'p'
+};
+
+let currentLevel = 0;
+let currentPrompt = '';
+let currentInput = '';
+let startTime = null;
+let correctCount = 0;
+let totalTyped = 0;
+let typingSound = true;
+
+const inputBox = document.getElementById('inputBox');
+const promptBox = document.getElementById('prompt');
+const outputBox = document.getElementById('output');
+const levelKeys = document.getElementById('levelKeys');
+const levelNumber = document.getElementById('levelNumber');
+const wpmDisplay = document.getElementById('wpm');
+const timeDisplay = document.getElementById('timeElapsed');
+const accuracyDisplay = document.getElementById('accuracy');
+const highScoreDisplay = document.getElementById('highScore');
+const soundToggle = document.getElementById('soundToggle');
+
+const typeSound = document.getElementById('typeSound');
+const correctSound = document.getElementById('correctSound');
+const incorrectSound = document.getElementById('incorrectSound');
+
+function generatePrompt(keys) {
+  let text = '';
+  const options = [...keys];
+  while (text.length < 30) {
+    text += options[Math.floor(Math.random() * options.length)];
+  }
+  return text;
+}
+
+function loadLevel(index) {
+  currentLevel = index;
+  const keys = typingLevels[currentLevel];
+  currentPrompt = generatePrompt(getAllLearnedKeys());
+  levelKeys.textContent = keys.join(', ');
+  levelNumber.textContent = currentLevel + 1;
+  promptBox.textContent = currentPrompt;
+  inputBox.value = '';
+  outputBox.innerHTML = '';
+  correctCount = 0;
+  totalTyped = 0;
+  startTime = performance.now();
+}
+
+function getAllLearnedKeys() {
+  return typingLevels.slice(0, currentLevel + 1).flat();
+}
+
+function handleTyping(input) {
+  let outputHTML = '';
+  currentInput = input;
+  totalTyped = input.length;
+
+  let vortexxInput = '';
+  for (let i = 0; i < input.length; i++) {
+    const original = input[i].toLowerCase();
+    vortexxInput += vortexxMap[original] || original;
+  }
+
+  correctCount = 0;
+  for (let i = 0; i < currentPrompt.length; i++) {
+    const expected = currentPrompt[i];
+    const typed = vortexxInput[i] || '';
+    if (typed === expected) {
+      outputHTML += `<span class="correct">${typed}</span>`;
+      correctCount++;
+      if (typingSound) correctSound.play();
+    } else {
+      outputHTML += `<span class="incorrect">${typed || ' '}</span>`;
+      if (typingSound && typed) incorrectSound.play();
+    }
+  }
+  outputBox.innerHTML = outputHTML;
+  updateStats();
+}
+
+function updateStats() {
+  const timeTaken = (performance.now() - startTime) / 1000;
+  const minutes = timeTaken / 60;
+  const words = correctCount / 5;
+  const wpm = Math.round(words / minutes);
+  const accuracy = Math.round((correctCount / totalTyped) * 100) || 0;
+  wpmDisplay.textContent = isFinite(wpm) ? wpm : 0;
+  accuracyDisplay.textContent = accuracy;
+  timeDisplay.textContent = timeTaken.toFixed(2);
+
+  const high = localStorage.getItem(`vortexx-wpm-level-${currentLevel}`);
+  if (!high || wpm > high) {
+    localStorage.setItem(`vortexx-wpm-level-${currentLevel}`, wpm);
+    highScoreDisplay.textContent = wpm;
+  } else {
+    highScoreDisplay.textContent = high;
+  }
+}
+
+function nextLevel() {
+  if (currentLevel + 1 < typingLevels.length) loadLevel(currentLevel + 1);
+}
+function prevLevel() {
+  if (currentLevel - 1 >= 0) loadLevel(currentLevel - 1);
+}
+function toggleSound() {
+  typingSound = !typingSound;
+  soundToggle.textContent = `🔊 Sound: ${typingSound ? 'On' : 'Off'}`;
+}
+function showHome() {
+  document.getElementById('homeUI').style.display = 'flex';
+  document.getElementById('trainerUI').style.display = 'none';
+}
+function startLevelFromHome(index) {
+  document.getElementById('homeUI').style.display = 'none';
+  document.getElementById('trainerUI').style.display = 'block';
+  loadLevel(index);
+}
+
+function createHomeButtons() {
+  const levelButtons = document.getElementById('levelButtons');
+  typingLevels.forEach((set, index) => {
+    const btn = document.createElement('button');
+    btn.className = 'levelBtn';
+    btn.textContent = `Level ${index + 1}: ${set.join(' + ')}`;
+    btn.onclick = () => startLevelFromHome(index);
+    levelButtons.appendChild(btn);
+  });
+}
+
+createHomeButtons();
+showHome();
